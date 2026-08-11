@@ -1,0 +1,22 @@
+# Secrets
+.env
+
+# Local database and trained model (generated, not source)
+data/documents.db
+data/bertopic_model/
+
+# Generated dashboard data (regenerated hourly by dashboard/generate_data.py)
+dashboard/data.js
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+.venv/
+
+# Claude Code runtime lock file (ephemeral, machine/session-specific)
+.claude/scheduled_tasks.lock

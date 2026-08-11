@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Topic Word Cloud</title>
+<style>
+  body {
+    font-family: -apple-system, Segoe UI, sans-serif;
+    background: #fafafa;
+    color: #222;
+    margin: 0;
+    padding: 2rem;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin: 0 0 0.25rem;
+  }
+  .subtitle {
+    color: #666;
+    font-size: 0.9rem;
+    margin: 0 0 1.5rem;
+  }
+  canvas {
+    display: block;
+    margin: 0 auto;
+    background: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+  }
+  .empty {
+    display: none;
+    text-align: center;
+    color: #888;
+    padding: 3rem;
+  }
+</style>
+</head>
+<body>
+  <h1>Topic word cloud &mdash; <span id="dateLabel"></span></h1>
+  <p class="subtitle">Word size = document count for that topic. Data regenerates hourly right after the scraper runs &mdash; refresh this tab to see updates. "Outliers" documents are excluded from the cloud.</p>
+
+  <canvas id="wordcloudCanvas" width="1200" height="700"></canvas>
+  <p class="empty" id="empty">No topics to show for this date.</p>
+
+  <script src="vendor/wordcloud2.js"></script>
+  <script src="data.js"></script>
+  <script>
+    document.getElementById('dateLabel').textContent = TOPIC_DATA.date;
+
+    const list = TOPIC_DATA.topics
+      .filter(function (t) { return t.label !== 'Outliers'; })
+      .map(function (t) { return [t.label, t.count]; });
+
+    if (list.length === 0) {
+      document.getElementById('wordcloudCanvas').style.display = 'none';
+      document.getElementById('empty').style.display = 'block';
+    } else {
+      const canvas = document.getElementById('wordcloudCanvas');
+
+      // Pick weightFactor so the widest label at its full size still fits the
+      // canvas width, so relative sizes stay proportional to count instead of
+      // getting distorted by wordcloud2's per-word shrink-to-fit retries.
+      const maxCount = Math.max.apply(null, list.map(function (item) { return item[1]; }));
+      const maxLabelLen = Math.max.apply(null, list.map(function (item) { return item[0].length; }));
+      const maxFontSizeThatFits = canvas.width / (maxLabelLen * 0.62);
+      const maxFontSize = Math.min(90, maxFontSizeThatFits * 0.9);
+      const weightFactor = maxFontSize / maxCount;
+
+      WordCloud(canvas, {
+        list: list,
+        weightFactor: weightFactor,
+        minSize: 10,
+        fontFamily: 'Consolas, monospace',
+        color: 'random-dark',
+        backgroundColor: '#ffffff',
+        rotateRatio: 0,
+        shrinkToFit: true,
+        gridSize: 8
+      });
+    }
+  </script>
+</body>
+</html>
