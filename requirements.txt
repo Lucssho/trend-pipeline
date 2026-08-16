@@ -1,0 +1,7 @@
+# RSS/feed parsing
+feedparser==6.0.14
+
+# Topic modeling (BERTopic pulls in sentence-transformers, hdbscan, plotly, etc. as its own dependencies)
+bertopic==0.17.4
+scikit-learn==1.9.0
+umap-learn==0.5.12
