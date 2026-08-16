@@ -2,82 +2,449 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Topic Word Cloud</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OSINT//WATCH</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --bg: oklch(15% 0.015 250);
+    --bg-panel: oklch(18% 0.016 250);
+    --bg-elev: oklch(22% 0.017 250);
+    --border: oklch(35% 0.02 250 / 0.5);
+    --text: oklch(92% 0.008 250);
+    --text-dim: oklch(62% 0.014 250);
+    --text-dim2: oklch(45% 0.012 250);
+    --green: oklch(78% 0.17 142);
+    --green-dim: oklch(45% 0.09 142);
+    --green-bg: oklch(78% 0.17 142 / 0.12);
+    --amber: oklch(80% 0.14 70);
+    --amber-dim: oklch(48% 0.09 70);
+    --amber-bg: oklch(80% 0.14 70 / 0.12);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); }
   body {
-    font-family: -apple-system, Segoe UI, sans-serif;
-    background: #fafafa;
-    color: #222;
-    margin: 0;
-    padding: 2rem;
+    display: grid;
+    grid-template-columns: 250px 1fr 320px;
+    grid-template-rows: 52px 1fr;
+    height: 100vh;
+    color: var(--text);
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    overflow: hidden;
   }
-  h1 {
-    font-size: 1.4rem;
-    margin: 0 0 0.25rem;
-  }
-  .subtitle {
-    color: #666;
-    font-size: 0.9rem;
-    margin: 0 0 1.5rem;
-  }
-  canvas {
-    display: block;
-    margin: 0 auto;
-    background: #ffffff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-  }
-  .empty {
-    display: none;
-    text-align: center;
-    color: #888;
-    padding: 3rem;
-  }
+  a { color: var(--green); text-decoration: none; }
+  a:hover { color: var(--amber); text-decoration: underline; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: oklch(30% 0.02 250); border-radius: 0; }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .topbar { grid-column: 1/4; display: flex; align-items: center; gap: 24px; padding: 0 18px; background: var(--bg-panel); border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: 9px; flex: none; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: blink 1.6s ease-in-out infinite; }
+  .live-dot.paused { background: var(--amber); box-shadow: 0 0 8px var(--amber); animation: none; }
+  .brand-label { font-size: 13px; font-weight: 700; letter-spacing: .12em; color: var(--text); }
+  .brand-label span { color: var(--green); }
+  .vdiv { width: 1px; height: 20px; background: var(--border); flex: none; }
+  .stats { display: flex; align-items: center; gap: 22px; font-size: 11.5px; color: var(--text-dim); flex: 1; overflow: hidden; white-space: nowrap; }
+  .stats b { color: var(--text); font-weight: 400; }
+  .stats .rate-val { color: var(--green); }
+  .filter-chip { color: var(--text-dim2); }
+  .filter-chip b { color: var(--amber); font-weight: 400; }
+  .filter-chip a { color: var(--text-dim); margin-left: 6px; }
+  #pauseBtn { flex: none; font-family: inherit; font-size: 11px; font-weight: 700; letter-spacing: .08em; padding: 6px 12px; cursor: pointer; background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+  #pauseBtn.paused { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-dim); }
+
+  .sidebar-left { grid-row: 2; background: var(--bg-panel); border-right: 1px solid var(--border); overflow-y: auto; padding: 14px 0; }
+  .panel-heading { padding: 0 14px 10px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; color: var(--text-dim2); }
+  .src-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 14px; cursor: pointer; background: transparent; }
+  .src-row:hover { background: var(--bg-elev); }
+  .src-row.selected { background: var(--bg-elev); }
+  .src-row-left { display: flex; align-items: center; gap: 7px; overflow: hidden; }
+  .src-marker { flex: none; font-size: 11px; width: 12px; color: var(--text-dim2); }
+  .src-row.selected .src-marker { color: var(--green); }
+  .src-label { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .src-row.selected .src-label { color: var(--text); }
+  .src-count { font-size: 11.5px; color: var(--green); font-weight: 600; flex: none; }
+  .sidebar-footnote { margin-top: 16px; padding: 10px 14px 0; border-top: 1px solid var(--border); font-size: 10px; color: var(--text-dim2); line-height: 1.7; }
+
+  .center { grid-row: 2; overflow-y: auto; padding: 12px 16px 40px; }
+  #searchInput { width: 100%; box-sizing: border-box; background: var(--bg-panel); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; padding: 8px 10px; margin-bottom: 10px; outline: none; }
+  #searchInput:focus { border-color: var(--text-dim); }
+  .post-card { background: var(--bg-panel); border: 1px solid var(--border); margin-bottom: 10px; padding: 12px 14px; }
+  .post-card.fresh { animation: slideIn 0.3s ease; }
+  .post-row1 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+  .post-badge { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; padding: 2px 6px; }
+  .post-time { font-size: 10.5px; color: var(--text-dim2); }
+  .post-title { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.45; margin-bottom: 5px; }
+  .post-excerpt { font-size: 12px; color: var(--text-dim); line-height: 1.55; margin-bottom: 9px; }
+  .kw { padding: 0 2px; cursor: pointer; font-weight: 600; color: var(--green); background: var(--green-bg); }
+  .kw.active { color: var(--bg); background: var(--green); }
+  .post-row2 { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .post-topic { font-size: 10px; color: var(--amber); border: 1px solid var(--amber-dim); padding: 2px 7px; letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .post-link { font-size: 11.5px; color: var(--text-dim); border-bottom: 1px dotted var(--text-dim2); flex: none; }
+  .empty-state { padding: 40px 0; text-align: center; color: var(--text-dim2); font-size: 12px; }
+
+  .sidebar-right { grid-row: 2; background: var(--bg-panel); border-left: 1px solid var(--border); overflow-y: auto; padding: 16px 16px 30px; }
+  .bar-row { margin-bottom: 8px; }
+  .bar-head { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-dim); margin-bottom: 3px; }
+  .bar-track { height: 5px; background: var(--bg-elev); }
+  .bar-fill { height: 100%; }
+  .bar-fill.green { background: var(--green); }
+  .bar-fill.amber { background: var(--amber); }
+  .bar-head .green-val { color: var(--green); }
+  .bar-head .amber-val { color: var(--amber); }
+  .section-gap { margin: 20px 0 10px; }
+  .ingest-block { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .ingest-value { display: flex; align-items: baseline; gap: 6px; }
+  .ingest-num { font-size: 26px; font-weight: 700; color: var(--green); }
+  .ingest-label { font-size: 11px; color: var(--text-dim2); }
 </style>
 </head>
 <body>
-  <h1>Topic word cloud &mdash; <span id="dateLabel"></span></h1>
-  <p class="subtitle">Word size = document count for that topic. Data regenerates hourly right after the scraper runs &mdash; refresh this tab to see updates. "Outliers" documents are excluded from the cloud.</p>
 
-  <canvas id="wordcloudCanvas" width="1200" height="700"></canvas>
-  <p class="empty" id="empty">No topics to show for this date.</p>
+<div class="topbar">
+  <div class="brand">
+    <span class="live-dot" id="liveDot"></span>
+    <span class="brand-label">OSINT<span>//</span>WATCH</span>
+  </div>
+  <div class="vdiv"></div>
+  <div class="stats">
+    <span>UPTIME <b id="uptimeVal">00:00:00</b></span>
+    <span>COLLECTED <b id="collectedVal">0</b></span>
+    <span>RATE <span class="rate-val" id="rateVal">0</span>/min</span>
+    <span class="filter-chip" id="filterChip" style="display:none">FILTER <b id="filterLabel"></b> <a href="#" id="clearFilterLink">[clear]</a></span>
+  </div>
+  <button id="pauseBtn">❙❙ PAUSE</button>
+</div>
 
-  <script src="vendor/wordcloud2.js"></script>
-  <script src="data.js"></script>
-  <script>
-    document.getElementById('dateLabel').textContent = TOPIC_DATA.date;
+<div class="sidebar-left">
+  <div class="panel-heading">ACTIVE SOURCES</div>
+  <div id="sourceRows"></div>
+  <div class="sidebar-footnote">
+    Sources: Reddit (4 subs) via public JSON API<br/>+ Krebs on Security &amp; BleepingComputer RSS.<br/>No CVE tracking · no severity scoring.
+  </div>
+</div>
 
-    const list = TOPIC_DATA.topics
-      .filter(function (t) { return t.label !== 'Outliers'; })
-      .map(function (t) { return [t.label, t.count]; });
+<div class="center">
+  <input id="searchInput" placeholder="grep feed…" autocomplete="off">
+  <div id="postsList"></div>
+</div>
 
-    if (list.length === 0) {
-      document.getElementById('wordcloudCanvas').style.display = 'none';
-      document.getElementById('empty').style.display = 'block';
-    } else {
-      const canvas = document.getElementById('wordcloudCanvas');
+<div class="sidebar-right">
+  <div class="panel-heading">VOLUME BY SOURCE</div>
+  <div id="sourceBars"></div>
 
-      // Pick weightFactor so the widest label at its full size still fits the
-      // canvas width, so relative sizes stay proportional to count instead of
-      // getting distorted by wordcloud2's per-word shrink-to-fit retries.
-      const maxCount = Math.max.apply(null, list.map(function (item) { return item[1]; }));
-      const maxLabelLen = Math.max.apply(null, list.map(function (item) { return item[0].length; }));
-      const maxFontSizeThatFits = canvas.width / (maxLabelLen * 0.62);
-      const maxFontSize = Math.min(90, maxFontSizeThatFits * 0.9);
-      const weightFactor = maxFontSize / maxCount;
+  <div class="panel-heading section-gap">VOLUME BY TOPIC</div>
+  <div id="topicBars"></div>
 
-      WordCloud(canvas, {
-        list: list,
-        weightFactor: weightFactor,
-        minSize: 10,
-        fontFamily: 'Consolas, monospace',
-        color: 'random-dark',
-        backgroundColor: '#ffffff',
-        rotateRatio: 0,
-        shrinkToFit: true,
-        gridSize: 8
-      });
-    }
-  </script>
+  <div class="ingest-block">
+    <div class="panel-heading">INGEST RATE</div>
+    <div class="ingest-value">
+      <span class="ingest-num" id="ingestRateVal">0</span>
+      <span class="ingest-label">posts / min</span>
+    </div>
+  </div>
+</div>
+
+<!-- Real data: defines `const FEED_DATA = {generatedAt, sources, topics, keywords, posts}` -->
+<script src="data.js"></script>
+<script>
+// ── Fallback sample so this file still renders if data.js is missing ──
+if (typeof FEED_DATA === 'undefined') {
+  window.FEED_DATA = {
+    generatedAt: new Date().toISOString(),
+    sources: [
+      { key: 'reddit_netsec', label: 'r/netsec', badge: 'REDDIT', count: 0 },
+      { key: 'reddit_cybersecurity', label: 'r/cybersecurity', badge: 'REDDIT', count: 0 },
+      { key: 'reddit_hacking', label: 'r/hacking', badge: 'REDDIT', count: 0 },
+      { key: 'reddit_asknetsec', label: 'r/AskNetsec', badge: 'REDDIT', count: 0 },
+      { key: 'krebs_on_security', label: 'Krebs on Security', badge: 'NEWS', count: 0 },
+      { key: 'bleeping_computer', label: 'BleepingComputer', badge: 'NEWS', count: 0 }
+    ],
+    topics: [],
+    keywords: [],
+    posts: []
+  };
+}
+
+// ── State ──
+let selectedSource = null;
+let selectedKeyword = null;
+let searchQuery = '';
+let paused = false;
+const startTime = Date.now();
+let lastTopId = null;
+
+// ── Keyword highlighting, built from the real trained-topic vocabulary ──
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+const KEYWORDS = (FEED_DATA.keywords || []).slice().sort((a, b) => b.length - a.length);
+const KW_RE = KEYWORDS.length ? new RegExp('\\b(' + KEYWORDS.map(escapeRe).join('|') + ')\\b', 'gi') : null;
+
+function fmtRel(ms) {
+  if (ms == null) return '—';
+  const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (s < 60) return 'vor ' + s + 's';
+  const m = Math.floor(s / 60);
+  if (m < 60) return 'vor ' + m + 'm';
+  const h = Math.floor(m / 60);
+  if (h < 24) return 'vor ' + h + 'h';
+  const d = Math.floor(h / 24);
+  return 'vor ' + d + 'd';
+}
+
+function fmtUptime(ms) {
+  const s = Math.floor(ms / 1000);
+  const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return hh + ':' + mm + ':' + ss;
+}
+
+function safeHref(url) {
+  try {
+    const u = new URL(url, window.location.href);
+    return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Builds highlighted-keyword spans via safe DOM APIs (title/excerpt text
+// comes from external RSS feeds, so no innerHTML string concatenation).
+function appendHighlighted(container, text) {
+  if (!KW_RE) { container.appendChild(document.createTextNode(text)); return; }
+  KW_RE.lastIndex = 0;
+  let last = 0, m;
+  while ((m = KW_RE.exec(text))) {
+    if (m.index > last) container.appendChild(document.createTextNode(text.slice(last, m.index)));
+    const word = m[0];
+    const lower = word.toLowerCase();
+    const span = document.createElement('span');
+    span.className = 'kw' + (selectedKeyword === lower ? ' active' : '');
+    span.textContent = word;
+    span.addEventListener('click', e => { e.stopPropagation(); selectKeyword(lower); });
+    container.appendChild(span);
+    last = m.index + word.length;
+  }
+  if (last < text.length) container.appendChild(document.createTextNode(text.slice(last)));
+}
+
+// ── Actions ──
+function togglePause() { paused = !paused; renderTopbar(); }
+function clearFilters(e) {
+  if (e) e.preventDefault();
+  selectedSource = null; selectedKeyword = null; searchQuery = '';
+  document.getElementById('searchInput').value = '';
+  renderAll();
+}
+function selectSource(key) {
+  selectedSource = selectedSource === key ? null : key;
+  renderAll();
+}
+function selectKeyword(kw) {
+  selectedKeyword = selectedKeyword === kw ? null : kw;
+  renderAll();
+}
+
+document.getElementById('searchInput').addEventListener('input', e => {
+  searchQuery = e.target.value;
+  renderPosts();
+  renderTopbarFilterChip();
+});
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
+document.getElementById('clearFilterLink').addEventListener('click', clearFilters);
+
+// ── Derived data ──
+function getFilteredPosts() {
+  let filtered = FEED_DATA.posts;
+  if (selectedSource) filtered = filtered.filter(p => p.sourceKey === selectedSource);
+  if (selectedKeyword) filtered = filtered.filter(p => (p.title + ' ' + p.excerpt).toLowerCase().includes(selectedKeyword));
+  const q = searchQuery.trim().toLowerCase();
+  if (q) filtered = filtered.filter(p => (p.title + ' ' + p.excerpt).toLowerCase().includes(q));
+  return filtered;
+}
+
+// ── Render: sidebars (static per full dataset — not affected by filters) ──
+function renderSidebars() {
+  const sourceRows = document.getElementById('sourceRows');
+  sourceRows.innerHTML = '';
+  FEED_DATA.sources.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'src-row' + (selectedSource === s.key ? ' selected' : '');
+    row.addEventListener('click', () => selectSource(s.key));
+    const left = document.createElement('div');
+    left.className = 'src-row-left';
+    const marker = document.createElement('span');
+    marker.className = 'src-marker';
+    marker.textContent = selectedSource === s.key ? '>' : '·';
+    const label = document.createElement('span');
+    label.className = 'src-label';
+    label.textContent = s.label;
+    left.appendChild(marker);
+    left.appendChild(label);
+    const count = document.createElement('span');
+    count.className = 'src-count';
+    count.textContent = s.count;
+    row.appendChild(left);
+    row.appendChild(count);
+    sourceRows.appendChild(row);
+  });
+
+  const maxSourceCount = Math.max(1, ...FEED_DATA.sources.map(s => s.count));
+  const sourceBars = document.getElementById('sourceBars');
+  sourceBars.innerHTML = '';
+  FEED_DATA.sources.forEach(s => {
+    sourceBars.appendChild(buildBar(s.label, s.count, Math.round(s.count / maxSourceCount * 100), 'green'));
+  });
+
+  const maxTopicCount = Math.max(1, ...FEED_DATA.topics.map(t => t.count));
+  const topicBars = document.getElementById('topicBars');
+  topicBars.innerHTML = '';
+  FEED_DATA.topics.forEach(t => {
+    topicBars.appendChild(buildBar(t.label, t.count, Math.round(t.count / maxTopicCount * 100), 'amber'));
+  });
+}
+
+function buildBar(label, count, pct, color) {
+  const row = document.createElement('div');
+  row.className = 'bar-row';
+  const head = document.createElement('div');
+  head.className = 'bar-head';
+  const labelSpan = document.createElement('span');
+  labelSpan.textContent = label;
+  const countSpan = document.createElement('span');
+  countSpan.className = color === 'green' ? 'green-val' : 'amber-val';
+  countSpan.textContent = count;
+  head.appendChild(labelSpan);
+  head.appendChild(countSpan);
+  const track = document.createElement('div');
+  track.className = 'bar-track';
+  const fill = document.createElement('div');
+  fill.className = 'bar-fill ' + color;
+  fill.style.width = pct + '%';
+  track.appendChild(fill);
+  row.appendChild(head);
+  row.appendChild(track);
+  return row;
+}
+
+// ── Render: post feed (rebuilt on filter/search/keyword change) ──
+function renderPosts() {
+  const list = document.getElementById('postsList');
+  list.innerHTML = '';
+  const visible = getFilteredPosts();
+
+  if (!visible.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.textContent = '// no transmissions match current filter';
+    list.appendChild(empty);
+    lastTopId = null;
+    return;
+  }
+
+  visible.forEach((p, idx) => {
+    const card = document.createElement('div');
+    card.className = 'post-card' + (idx === 0 && p.id !== lastTopId ? ' fresh' : '');
+
+    const row1 = document.createElement('div');
+    row1.className = 'post-row1';
+    const badge = document.createElement('span');
+    badge.className = 'post-badge';
+    badge.style.color = p.badge === 'REDDIT' ? 'var(--green)' : 'var(--amber)';
+    badge.style.background = p.badge === 'REDDIT' ? 'var(--green-bg)' : 'var(--amber-bg)';
+    badge.textContent = p.badge === 'REDDIT' ? ('REDDIT ' + p.sourceLabel) : (p.sourceLabel || 'NEWS');
+    const time = document.createElement('span');
+    time.className = 'post-time';
+    time.dataset.ts = p.ts;
+    time.textContent = fmtRel(p.ts);
+    row1.appendChild(badge);
+    row1.appendChild(time);
+
+    const title = document.createElement('div');
+    title.className = 'post-title';
+    appendHighlighted(title, p.title || '(untitled)');
+
+    const excerpt = document.createElement('div');
+    excerpt.className = 'post-excerpt';
+    appendHighlighted(excerpt, p.excerpt || '');
+
+    const row2 = document.createElement('div');
+    row2.className = 'post-row2';
+    const topic = document.createElement('span');
+    topic.className = 'post-topic';
+    topic.textContent = p.topic;
+    const href = safeHref(p.url);
+    const link = document.createElement(href ? 'a' : 'span');
+    link.className = 'post-link';
+    link.textContent = 'View Source →';
+    if (href) { link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer'; }
+    row2.appendChild(topic);
+    row2.appendChild(link);
+
+    card.appendChild(row1);
+    card.appendChild(title);
+    card.appendChild(excerpt);
+    card.appendChild(row2);
+    list.appendChild(card);
+  });
+
+  lastTopId = visible[0].id;
+}
+
+// ── Render: topbar (uptime/collected/rate tick every second; filter chip on change) ──
+function renderTopbarFilterChip() {
+  let label = '';
+  if (selectedSource) {
+    const src = FEED_DATA.sources.find(s => s.key === selectedSource);
+    label = src ? src.label : selectedSource;
+  }
+  if (selectedKeyword) label = (label ? label + ' + ' : '') + selectedKeyword;
+  const q = searchQuery.trim();
+  if (q) label = (label ? label + ' + ' : '') + '"' + q + '"';
+
+  const chip = document.getElementById('filterChip');
+  if (label) {
+    chip.style.display = '';
+    document.getElementById('filterLabel').textContent = label;
+  } else {
+    chip.style.display = 'none';
+  }
+}
+
+function renderTopbar() {
+  const now = Date.now();
+  document.getElementById('uptimeVal').textContent = fmtUptime(now - startTime);
+  document.getElementById('collectedVal').textContent = FEED_DATA.posts.length;
+  const lastMinCount = FEED_DATA.posts.filter(p => p.ts != null && now - p.ts < 60000).length;
+  document.getElementById('rateVal').textContent = lastMinCount;
+  document.getElementById('ingestRateVal').textContent = lastMinCount;
+
+  document.getElementById('liveDot').className = 'live-dot' + (paused ? ' paused' : '');
+  const pauseBtn = document.getElementById('pauseBtn');
+  pauseBtn.textContent = paused ? '▸ RESUME' : '❙❙ PAUSE';
+  pauseBtn.className = paused ? 'paused' : '';
+
+  // Update relative timestamps in place without rebuilding the post list
+  // (avoids replaying the entrance animation and losing search-box focus).
+  document.querySelectorAll('.post-time').forEach(el => {
+    const ts = el.dataset.ts === 'null' || el.dataset.ts === '' ? null : Number(el.dataset.ts);
+    el.textContent = fmtRel(ts);
+  });
+}
+
+function renderAll() {
+  renderSidebars();
+  renderPosts();
+  renderTopbar();
+  renderTopbarFilterChip();
+}
+
+renderAll();
+setInterval(() => { if (!paused) renderTopbar(); }, 1000);
+</script>
 </body>
 </html>

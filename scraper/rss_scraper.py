@@ -13,11 +13,12 @@ from storage.db import get_connection, init_db, count_documents
 from text_utils import strip_html
 
 FEEDS = {
-    "bbc_world": "https://feeds.bbci.co.uk/news/world/rss.xml",
     "reddit_cybersecurity": "https://www.reddit.com/r/cybersecurity/.rss",
     "reddit_netsec": "https://www.reddit.com/r/netsec/.rss",
     "reddit_hacking": "https://www.reddit.com/r/hacking/.rss",
     "reddit_asknetsec": "https://www.reddit.com/r/AskNetsec/.rss",
+    "krebs_on_security": "https://krebsonsecurity.com/feed/",
+    "bleeping_computer": "https://www.bleepingcomputer.com/feed/",
 }
 
 # Reddit's unauthenticated RSS endpoint enforces a strict per-IP rate limit
